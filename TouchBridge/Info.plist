@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key><string>TouchBridge</string>
+    <key>CFBundleDisplayName</key><string>触控板 OSC 桥</string>
+    <key>CFBundleIdentifier</key><string>io.github.eric-sxr.touchbridge</string>
+    <key>CFBundleExecutable</key><string>TouchBridge</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>1.1.1</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Maintained and adapted by Eric_SXR; based on community and upstream work.</string>
+    <key>LSMinimumSystemVersion</key><string>12.0</string>
+    <key>NSInputMonitoringUsageDescription</key>
+    <string>读取内置触控板的多点触控位置，用于生成音游谱面。数据仅发送到本机。</string>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>NSPrincipalClass</key><string>NSApplication</string>
+</dict>
+</plist>

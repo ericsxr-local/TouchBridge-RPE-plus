@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="YvBN2O9qYURfcWTfkUOhpU">
+<head data-page-node-id="ehOHJIGFsjl2OHVqScaZBw">
+<meta charset="UTF-8" data-page-node-id="dOGvDMpHLaFTEXNHWrEyMs" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="dX8XxN8eVIwSTZfJBTSCkF" />
+<title>TouchBridge → RPE 制谱采集器</title>
+<script src="/vendor/socket.io.min.js"></script>
+<style>
+  :root{
+    --bg:#0e1320; --panel:#161d2e; --line:#27304a; --text:#e8eef7; --muted:#8b97ad;
+    --blue:#3aa0ff; --green:#33d69f; --amber:#ffcf4d; --red:#ff5d6c; --accent:#7c5cff;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--text);font-size:13px;}
+  header{background:#0a0f1a;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);}
+  header h1{font-size:15px;margin:0;font-weight:600;}
+  header .hint{font-size:12px;color:var(--muted);}
+  .wrap{display:flex;gap:12px;padding:12px;align-items:flex-start;}
+  .left{width:330px;flex:0 0 330px;display:flex;flex-direction:column;gap:12px;}
+  .right{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;}
+  .card h2{font-size:13px;margin:0 0 10px;font-weight:600;color:#cdd8ee;border-bottom:1px solid var(--line);padding-bottom:6px;}
+  label{display:block;margin:8px 0 3px;color:var(--muted);font-size:12px;}
+  input,select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:13px;background:#0e1424;color:var(--text);}
+  .row{display:flex;gap:8px;}
+  .row > div{flex:1;}
+  button{cursor:pointer;border:none;border-radius:8px;padding:8px 10px;font-size:13px;font-weight:500;color:#fff;background:var(--blue);}
+  body.recording-lock,body.recording-lock *{cursor:none!important;}
+  button:hover{filter:brightness(1.08);}
+  button.sec{background:#3a455f;}
+  button.green{background:var(--green);color:#06381f;}
+  button.red{background:var(--red);}
+  button.amber{background:var(--amber);color:#3a2c00;}
+  button:disabled{opacity:.5;cursor:not-allowed;}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .toast{position:fixed;right:16px;bottom:16px;background:#222a3d;color:#fff;padding:10px 14px;border-radius:8px;
+         font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:99;max-width:340px;border:1px solid var(--line);}
+  .toast.show{opacity:.96;}
+  .toast.success{background:#1d6b46;} .toast.error{background:#a93226;} .toast.info{background:#2c3e50;} .toast.warn{background:#9a6b1f;}
+  #monitor{height:140px;overflow:auto;background:#0a0f1a;color:#7fe3c4;font-family:ui-monospace,Menlo,Consolas,monospace;
+           font-size:11px;padding:8px;border-radius:8px;white-space:pre-wrap;}
+  canvas{width:100%;max-width:440px;height:600px;background:#070b14;border-radius:10px;display:block;margin:0 auto;}
+  .stat{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap;}
+  .stat b{color:var(--text);}
+  .small{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;}
+  a.dl{color:var(--blue);text-decoration:none;font-weight:600;}
+  .proto{background:#13203a;border:1px solid #28406b;color:#bcd4ff;border-radius:7px;padding:8px 10px;font-size:11px;line-height:1.6;font-family:ui-monospace,Menlo,Consolas,monospace;margin-top:8px;}
+  .lights{display:flex;gap:10px;flex-wrap:wrap;}
+  .light{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+  .dotled{width:10px;height:10px;border-radius:50%;background:#3a455f;box-shadow:0 0 0 0 rgba(0,0,0,0);}
+  .dotled.on{background:var(--green);box-shadow:0 0 8px var(--green);}
+  .dotled.bad{background:var(--red);box-shadow:0 0 8px var(--red);}
+  .dotled.warn{background:var(--amber);box-shadow:0 0 8px var(--amber);}
+  .legend{display:flex;gap:14px;font-size:12px;margin-top:8px;flex-wrap:wrap;}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .bar{width:14px;height:10px;border-radius:3px;display:inline-block;}
+</style>
+</head>
+<body data-page-node-id="2A9hFzaN3SSG9J32gy9XyR">
+<header data-page-node-id="5KVDl4FcXEHsYDxBAMfw2i">
+  <h1 data-page-node-id="1stEFHG1EOK6SCRsr4fpmS">TouchBridge → RPE 制谱采集器</h1>
+  <span class="hint" data-page-node-id="syfVU9ZN5RCrBc6956BXyA">听歌打触控板 → 自动生成 Phigros 谱面（Tap/Hold/Flick/Drag）</span>
+</header>
+
+<div class="wrap" data-page-node-id="wCD8HvJfyiSDYlDZWnFeuz">
+  <!-- 左侧控制 -->
+  <div class="left" data-page-node-id="OqBfloxstNUW9JhUpTbDmB">
+    <div class="card" data-page-node-id="0fFBiKS1OH2Tig994alHub">
+      <h2 data-page-node-id="oU7wY8ZKvvrqm3vKB3dbmd">① 音频（声音在浏览器播放）</h2>
+      <input type="file" id="audioFile" accept="audio/*" data-page-node-id="H8ckE2DbZcBNLcSYap2XWE" />
+      <div class="btns" data-page-node-id="TKbB9FyYqvYVL0N26gegJT">
+        <button id="uploadBtn" data-page-node-id="Ep0QFODsRFnhwIs80BIsDp">导入音频</button>
+        <button class="sec" id="playBtn" data-page-node-id="wSgzjJ2IfuM2cCw35KdJPY">▶ 播放</button>
+        <button class="sec" id="pauseBtn" data-page-node-id="9gZJJYLiipdn2Eqf9mEQCs">⏸ 暂停</button>
+        <button class="sec" id="stopBtn" data-page-node-id="M4n74j2Tod3VJPrZDWAiPP">⏹ 停止</button>
+      </div>
+      <audio id="audioEl" controls preload="auto" style="width:100%;margin-top:8px;background:#0e1424;"></audio>
+      <div class="small" id="audioInfo" data-page-node-id="zwNo3THUklXevcIs14z97d">选择音频后会自动导入；点播放声音从浏览器放出，也可直接用上面的播放器。录制以音频时间为节拍基准。</div>
+    </div>
+
+    <div class="card">
+      <h2>①.5 曲绘（可选）</h2>
+      <input type="file" id="coverFile" accept="image/*" />
+      <div class="btns">
+        <button id="coverBtn">导入曲绘</button>
+        <button class="sec" id="coverClearBtn">清除曲绘</button>
+      </div>
+      <img id="coverPreview" alt="曲绘预览" style="max-width:100%;border-radius:7px;margin-top:8px;display:none;" />
+      <div class="small" id="coverInfo">可选：选一张曲绘（封面图），会和音乐一起 <b>打包进通用 .pez</b>（iPad Phira 与 Windows RPE 都直接导入这一个文件）。不选则自动生成渐变占位图。</div>
+    </div>
+
+    <div class="card" data-page-node-id="YV5t6GiZVbnd5DeG6BMFT9">
+      <h2 data-page-node-id="iDz6CHsZx0vDJ51Gq97r38">② 节拍与量化</h2>
+      <div class="row" data-page-node-id="EQtOM8vP7CiP768TPKcPhL">
+        <div data-page-node-id="EELQNcGWgHRCP4l3ARsRNE"><label data-page-node-id="mhqZcJeS2jSFbXlkvgz4mf">BPM</label><input id="bpm" type="number" value="120" step="1" data-page-node-id="GLlb632D5vAvbiIwieCyXp" /></div>
+        <div data-page-node-id="bE5I84dlOB6o6SCqssBfq1"><label data-page-node-id="cK7BxTI8fPMg8uSEHMJo8k">Offset(ms)</label><input id="offset" type="number" value="0" step="1" data-page-node-id="9SWoswgTfDDFHghaIW2Ek8" /></div>
+      </div>
+      <div class="row" data-page-node-id="j5ghVbGss3Z7M9YXaiR823">
+        <div data-page-node-id="sZ3ECZjuqXb5YTFVL9Hlgn"><label data-page-node-id="6wq2FrHjeWDC6x7lyOjxWS">每小节拍数</label><input id="bpb" type="number" value="4" step="1" data-page-node-id="PFjIONVe23dGzlnUFzZABN" /></div>
+        <div data-page-node-id="oOEuM0SNVXyg3A1F9ptfCL"><label data-page-node-id="hitrEBU5hP1UaDOeu2vKiT">量化细分</label>
+          <select id="subdiv" data-page-node-id="cESitvMgXLHBeUzJUSgxCc">
+            <option value="4" data-page-node-id="1BA2CAoqeCzzyZAuL4ZXnD">1/4 拍</option>
+            <option value="8" data-page-node-id="yABe1QKJ1QnTyrL7DCEUyu">1/8 拍</option>
+            <option value="16" selected data-page-node-id="sjsjM7UfaUveTwuMlxHDT8">1/16 拍</option>
+            <option value="32">1/32 拍（快速连点）</option>
+          </select>
+        </div>
+      </div>
+      <label data-page-node-id="56UPD9B7WNAjfOqrPlZVZ4">吸附容差：<span id="tolVal" data-page-node-id="6wGnguIZMBFxSd79CegVW3">0.60</span>（0=不吸附保留自由，1=全吸附）</label>
+      <input id="tol" type="range" min="0" max="1" step="0.05" value="0.6" data-page-node-id="tx2Kgz01MoWGZdxOB9Ei4N" />
+      <div class="row" data-page-node-id="HAcWBrumIxoyAtREEYTOed">
+        <div data-page-node-id="y4koB2Tnws3GOkEH7UkE8y"><label data-page-node-id="gkXSGx5uychRysVWq3Eyqe">去抖(ms)</label><input id="debounce" type="number" value="20" step="5" data-page-node-id="yAJEWhOD98g39It7qu4dQW" /></div>
+        <div data-page-node-id="0bdLGBHgIzmwr108QIeCbo"><label data-page-node-id="gGMSvb5IfopEYRRCrfxuKY">X 模式</label>
+          <select id="xmode" data-page-node-id="Y2ynhxVD8K5sLE8T1CbiCB">
+            <option value="coordinate" selected data-page-node-id="IjG9ujDm3JaRi9c2wfvF3j">连续坐标</option>
+            <option value="region" data-page-node-id="MuHOVLY9DbPPxhAWNfZkfn">9 区域</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" data-page-node-id="hitOffRow">
+        <div data-page-node-id="hO1"><label data-page-node-id="hO2">采样补偿(ms)</label><input id="hit_offset" type="number" value="0" step="5" data-page-node-id="hO3" /></div>
+        <div data-page-node-id="hO4"><button id="calibBtn" class="sec" data-page-node-id="hO5">自动校准</button></div>
+      </div>
+      <div class="small" data-page-node-id="hO6">录音链路 / 音频输出延迟会让音符系统性偏早(快)或偏晚(慢)。正值=音符延后，负值=提前；也可点「自动校准」按你已录音符自动估算（假设你敲在整拍上）。</div>
+    </div>
+
+    <div class="card" data-page-node-id="V8WD3DJavp1P3fcLhrHtIZ">
+      <h2 data-page-node-id="ZAm4UwYKR44Gy0mbHyuVPp">③ Flick 红键判定（你给的算法）</h2>
+      <label data-page-node-id="w6clj8MEiGKo7lraFtr7Yc">死区(忽略微抖)：<span id="dzVal" data-page-node-id="pI7ZhDVFHueyXGiQgvO77c">0.03</span></label>
+      <input id="deadZone" type="range" min="0.005" max="0.1" step="0.005" value="0.03" data-page-node-id="DGFHVWQUVcWhlvYWPQq6Be" />
+      <label data-page-node-id="JTNfyxcQdbDGIpAEx1ZDZE">Hold 最短时长(s)：<span id="hmtVal" data-page-node-id="tjnQdJQ0wOT1HIG9mzCEUS">0.20</span></label>
+      <input id="holdMinTime" type="range" min="0.05" max="0.6" step="0.01" value="0.2" data-page-node-id="U7ZnD5xt79LbAKns3z4Xla" />
+      <label data-page-node-id="mzDBqwpckNEc9BfBpL9Yjc">Flick 时间窗(s，按下到抬起)：<span id="fwVal" data-page-node-id="ZCXPlC9gd3hDqAJtqiwdk0">0.20</span></label>
+      <input id="flickWindow" type="range" min="0.05" max="0.5" step="0.01" value="0.2" data-page-node-id="B2FnZ4a8w5q3sfAxz1wdDz" />
+      <label data-page-node-id="ae7N9DjvboPECbMzJqaDQi">Flick 速度阈值(归一化/秒)：<span id="fvVal" data-page-node-id="u9GqpXknlcQbWMBFzLtUHL">2.00</span></label>
+      <input id="flick" type="range" min="0.5" max="8" step="0.1" value="2.0" data-page-node-id="K3lG54EeGPkRmGv11NZXxo" />
+      <label data-page-node-id="rqcAfO4ryeHsFRkdliZj9k">Flick 最大距离(归一化)：<span id="fmdVal" data-page-node-id="yFd2iVsrkZQwczUh32rnT9">0.25</span></label>
+      <input id="flickMaxDist" type="range" min="0.05" max="0.6" step="0.01" value="0.25" data-page-node-id="wNmo97i0XzerIwxBGsMtTd" />
+      <label data-page-node-id="iAb96CHOkIxO13GcuotHFA">拖拽采样间隔(ms)：<span id="dsVal" data-page-node-id="L1iafnv5kN4bk7NbmybZGx">25</span></label>
+      <input id="dragSample" type="range" min="10" max="80" step="5" value="25" data-page-node-id="yJONwDY4szV62wozDz0dut" />
+      <label data-page-node-id="qB7d4XhLk3m9pQaR2sT1u">拖拽最小速度(归一化/秒)：<span id="dmsVal" data-page-node-id="pLk9s2aBx7cV1nM3qR4tZ">0.25</span></label>
+      <input id="dragMinSpeed" type="range" min="0.05" max="1.0" step="0.05" value="0.25" data-page-node-id="mN3kVc8sLp2xQ9aB7dF1h" />
+      <label data-page-node-id="rC8e2VhN1kL7mP3qS5tX9">拖拽最长时长(s)：<span id="dmdVal" data-page-node-id="wQ2kL9xP3mN7vB1cS8dF4">1.5</span></label>
+      <input id="dragMaxDur" type="range" min="0.3" max="3.0" step="0.1" value="1.5" data-page-node-id="zX5nM2bV8kL4pR1cT7sQ3" />
+      <div class="small" data-page-node-id="9jD3Q0ixghopjdW4ARh1JA">短促快划→<b style="color:var(--red)" data-page-node-id="tyKhopzycGtDSxpW0CvH7K">红键Flick</b>；慢速长移→<b style="color:var(--amber)" data-page-node-id="wHLqEYfeBHQ1zbuuhfVw3E">黄键Drag</b>；几乎不动→Tap/Hold。距离小于"死区"直接当 Tap（去抖）。<br data-page-node-id="aB1cD2eF3gH4iJ5kL6mN7">「拖拽最小速度 / 最长时长」用于把"长按时手指轻微漂移"自动归为 Hold，避免生成乱糟糟的长拖尾。</div>
+    </div>
+
+    <div class="card" data-page-node-id="biP3RuFyg3AHAEzO6m3cUS">
+      <h2 data-page-node-id="WXM5H3U0N7k4JCdzY9ZtfF">④ OSC 监听（TouchBridge）</h2>
+      <div class="row" data-page-node-id="DTApyohsUq3bO4rChbotWC"><div data-page-node-id="NaLa0G6ByB7xENYafOiQ8G"><label data-page-node-id="AiAxTu8vfyZqoyuMtO1U9w">端口</label><input id="oscPort" type="number" value="9000" data-page-node-id="xPMdBnfbSBEbO1mUzPx0pN" /></div></div>
+      <div class="btns" data-page-node-id="PhuO0Qg2wtWAdVNqnC15cV">
+        <button class="amber" id="monBtn" data-page-node-id="fS9GhRQM73PYiD9qnyrpW7">开始监听 OSC</button>
+        <button class="sec" id="selftestBtn" data-page-node-id="6lOyONhDtv6lGDJ0kR22Ef">测试 OSC 自检</button>
+        <button class="sec" id="simBtn" data-page-node-id="RlFEzmaao9UUKHyUndQyHE">注入模拟手势</button>
+      </div>
+      <div class="proto" data-page-node-id="jgcUSZ6XdUpks42l9LRKXm">已按 TouchBridge 真实协议自动解析：<br data-page-node-id="jcvCQq53zf7vwOhEvODdoL">
+        /down [槽,x,y,area,区] · /move [槽,x,y,area]<br data-page-node-id="vfmBQCCkuGIKboEh93MHn9">
+        /hold [槽,x,y] · /drag [槽,x,y] · /tap [槽,x,y,durMs] · /up [槽,durMs,maxDist]<br data-page-node-id="44BPVGUBtsfhUy0twZwadh">
+        坐标 x,y 为连续 0~1（9 区域仅给 Max 选音色，不影响精度）。</div>
+    </div>
+  </div>
+
+  <!-- 右侧预览 + 日志 -->
+  <div class="right" data-page-node-id="M5pUcqyzS2l7aSefOXpJHX">
+    <div class="card" data-page-node-id="5bu6rEnnsUXqmRFTELIX1C">
+      <h2 data-page-node-id="1W83CfrW8EDKtl9kK4VCcc">⑤ 录制与导出</h2>
+      <div class="lights" style="margin-bottom:8px;" data-page-node-id="xSmVnn4m7YtKZjv4Fj6Xrj">
+        <span class="light" data-page-node-id="yTUhNrk6bui1FYMS5F8dDo"><i class="dotled" id="ledSock" data-page-node-id="wD9cQTCtBFRrD8ORpoDBw1"></i>服务连接</span>
+        <span class="light" data-page-node-id="krUWl9JZwqbhJ0Lzs5Wsfn"><i class="dotled" id="ledOsc" data-page-node-id="ECqh3mQ3fFSzv7sDQG9R00"></i>OSC 监听</span>
+        <span class="light"><i class="dotled" id="ledPad"></i>触控板数据</span>
+        <span class="light" data-page-node-id="5ZKBP0m7raUBJxgHHhj2jS"><i class="dotled" id="ledAudio" data-page-node-id="n1NGXZcVatDFl8hyGFFPns"></i>音频已加载</span>
+      </div>
+      <div class="btns" data-page-node-id="6hSgZB51mEiiTGjTB8ZFWB">
+        <button class="green" id="recBtn" data-page-node-id="F5eEjI1CYljDh8cKohd5Ce">● 开始录制</button>
+        <button class="red" id="stopRecBtn" data-page-node-id="g5SjCrXCmD4gBBlUWHHk96">■ 停止录制</button>
+        <button class="sec" id="clearBtn" data-page-node-id="LhvYIe6MX0AWqWJ5YSGML6">清空</button>
+        <button class="amber" id="exportBtn" data-page-node-id="sQ4cmHz7IH47eNkVpjjcwd">导出 RPE</button>
+        <button class="sec" id="openBtn" data-page-node-id="oP3kL9mN2bV7cX1zQ8sR4">打开导出文件夹</button>
+      </div>
+      <div class="row" style="margin-top:8px;" data-page-node-id="UEqLLZQDojoKECM9DIeKNF">
+        <div data-page-node-id="e0Cb0FCNOfJVjAZIFouoF2"><label data-page-node-id="6qsOgsP0dW1rikZHD0t1dS">谱面名称（导出文件名）</label><input id="chartName" value="Untitled" data-page-node-id="6Ss3ajaOOJmHj1eaNHfCFF" /></div>
+        <div data-page-node-id="ZNEunrlFQK0EgWQpDz0WBQ"><label data-page-node-id="RKEdxOjENrEG3lzI7caItj">难度</label><input id="chartLevel" value="" data-page-node-id="xUx8iKDXQcRgIQ02VS0ODj" /></div>
+      </div>
+      <div class="row" style="margin-top:8px;" data-page-node-id="metaRow2">
+        <div data-page-node-id="cp1"><label data-page-node-id="cp2">作曲者</label><input id="composer" value="" data-page-node-id="cp3" /></div>
+        <div data-page-node-id="cp4"><label data-page-node-id="cp5">谱面设计</label><input id="charter" value="" data-page-node-id="cp6" /></div>
+      </div>
+      <div class="stat" style="margin-top:10px;" data-page-node-id="rQlsp9OaV28DygKqDkcko1">
+        <span data-page-node-id="qynXNhuONnSZOHWGE6ppKa">音符数：<b id="evCount" data-page-node-id="Cfa4kKHcYUeay7UV7abMzS">0</b></span>
+        <span data-page-node-id="xS8rslRghPhorE2sgdBpmK">录制中：<b id="recState" data-page-node-id="tvBY153BXgGG396mQ5kkA4">否</b></span>
+        <span data-page-node-id="VYK7nxcrBLCr7BFIiBM1zk">音频时钟：<b id="clk" data-page-node-id="I1lt3DK3qZnrkh4d6C10D3">0.00s</b></span>
+      </div>
+      <div id="dl" class="small" data-page-node-id="e7whUF2eChVwkL17385GQK"></div>
+      <div class="small" data-page-node-id="inmF2h1sJAEzJ7rWeVv9NP">建议流程：导入音频→填 BPM→开始监听 OSC（看右下角有原始消息）→开始录制（同时点播放，跟着音乐打触控板）→停止→导出 RPE→拖进 RPE/Phigros 编辑器。</div>
+    </div>
+
+    <div class="card" data-page-node-id="ompvr7IlHW1KLs8og0PB7W">
+      <h2 data-page-node-id="IePoeJ3NNGWHVuOLWrjpDQ">⑥ 谱面预览（类 Phigros 竖向滚动）</h2>
+      <div class="row" data-page-node-id="jL2kP9mN3bV8cX4zQ1sR7">
+        <div data-page-node-id="aB3cD4eF5gH6iJ7kL8mN9"><label data-page-node-id="nO1pQ2rS3tU4vW5xY6zA7">判定线位置</label>
+          <select id="judgeMode" data-page-node-id="bC8dE9fG1hI2jK3lM4nO5">
+            <option value="top" selected data-page-node-id="pQ6rS7tU8vW9xY1zA2bC3">顶部（音符下落·线在上方）</option>
+            <option value="bottom" data-page-node-id="dE4fG5hI6jK7lM8nO9pQ1">底部（音符下落·经典）</option>
+          </select>
+        </div>
+      </div>
+      <canvas id="cv" data-page-node-id="ZKSMfJtSQ5TzDEnK9MhZ9Z"></canvas>
+      <div class="legend" data-page-node-id="jOgbA5KytlP2AucSm1ulmp">
+        <span data-page-node-id="NNNWzoS4pUFTVeecp1sOP4"><i class="bar" style="background:var(--blue)" data-page-node-id="8DpKfkPd2DoHZTYoPjIq8g"></i>Tap</span>
+        <span data-page-node-id="W7wEdUbs0Zpt2F7GaL4XOw"><i class="bar" style="background:var(--green)" data-page-node-id="m15auzUkjeKX9Adb4zOfGy"></i>Hold(长条)</span>
+        <span data-page-node-id="sZLE778e2nq7QjfWZ421s0"><i class="bar" style="background:var(--amber)" data-page-node-id="FxC3RyChAh4iiqZYZlCjDt"></i>Drag(轨迹)</span>
+        <span data-page-node-id="EvJOjmkR4YCGWWZxhBcuvr"><i class="bar" style="background:var(--red)" data-page-node-id="qrb4VoGNSP7L9po4ZrBA9D"></i>Flick(红键↗)</span>
+        <span style="color:var(--muted)" data-page-node-id="Kvtak4ot0VoGvfFifL8OZe">竖线=X 分区 · 横线=拍点 · 亮线=判定线（位置可在上方切换）</span>
+      </div>
+    </div>
+
+    <div class="card" data-page-node-id="QuofBHVui82f4zbjlUy360">
+      <h2 data-page-node-id="g5GpXWcT7Kw48DBJIaaVsf">⑦ OSC 原始消息</h2>
+      <div id="monitor" data-page-node-id="2EeFcsyyuwLGjDTaDkjmEO">点击"开始监听 OSC"后，这里会实时显示 TouchBridge 发来的消息…</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" data-page-node-id="IBaiJyLO6Og3u9yyl1wUD1"></div>
+
+<script>
+const socket = io();
+document.documentElement.dataset.edition='Eric_SXR';
+console.log('%cTouchBridge-RPE · Eric_SXR Edition','color:#6bdcff;font-weight:bold;font-size:14px');
+console.log('Maintained and adapted by Eric_SXR · based on upstream and community MultitouchSupport work · not claimed as original.');
+let preview = {notes:[], playhead:0, audioTime:0, bpm:120, beats_per_bar:4, segments:[], offset_ms:0, revision:-1};
+let monitoring = false;
+
+// A normal launch should be ready to use immediately. The old page required
+// an extra manual click, which made a healthy collector look undetected.
+socket.on('connect', ()=>{
+  if(monitoring) return;
+  monitoring=true;
+  socket.emit('monitor_start');
+  const b=document.getElementById('monBtn');
+  if(b) b.textContent='停止监听 OSC';
+});
+socket.on('disconnect', ()=>{
+  monitoring=false;
+  const b=document.getElementById('monBtn');
+  if(b) b.textContent='开始监听 OSC';
+});
+
+// 浏览器端音频（声音从这里放出，使用页面上的原生播放器，最稳）
+const audio = document.getElementById('audioEl');
+audio.preload = "auto";
+function pushAudioTime(){
+  socket.emit('audio_time', {t: audio.currentTime||0, playing: !audio.paused && !audio.ended});
+}
+audio.addEventListener('play',  pushAudioTime);
+audio.addEventListener('pause', pushAudioTime);
+audio.addEventListener('seeked', pushAudioTime);
+audio.addEventListener('ended', pushAudioTime);
+audio.addEventListener('error', ()=>{
+  const c = audio.error && audio.error.code;
+  toast('音频加载失败(code '+c+')：文件格式可能不支持，或上传失败', 'error');
+});
+// 后端用单调时钟在两次上报之间插值；20 Hz 已足够精确，也不会与动画帧
+// 重复发送，避免 Socket.IO 消息挤占浏览器主线程并造成音频卡顿。
+setInterval(()=>{ if(!audio.paused && !audio.ended) pushAudioTime(); }, 50);
+
+function toast(msg, level){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show '+(level||'');
+  setTimeout(()=>t.className='toast', 3000);
+}
+socket.on('toast', d=>toast(d.msg, d.level));
+socket.on('calibrated', d=>{ setVal('hit_offset', d.hit_offset_ms); saveSettings(); });
+
+socket.on('state', d=>{
+  document.getElementById('evCount').textContent=d.note_count;
+  document.getElementById('recState').textContent=d.recording?'是':'否';
+  // Recover control correctly after a page refresh/reconnect during a take.
+  // Without this, the backend could still be recording while the local Stop
+  // button believed it was idle and refused to send record_stop.
+  if(typeof isRecording!=='undefined'){
+    isRecording=!!d.recording;
+    if(isRecording) document.body.classList.add('recording-lock');
+    else document.body.classList.remove('recording-lock');
+  }
+  document.getElementById('clk').textContent=(d.audio_time||0).toFixed(2)+'s';
+  // 状态灯
+  setLed('ledSock', true);
+  setLed('ledOsc', d.monitor_status==='listening', d.monitor_status==='failed');
+  setLed('ledPad', !!d.collector_alive, false);
+  setLed('ledAudio', d.audio_loaded);
+  if(d.settings){
+    setVal('bpm',d.settings.bpm); setVal('offset',d.settings.offset_ms);
+    setVal('bpb',d.settings.beats_per_bar); setVal('subdiv',d.settings.subdivision);
+    setVal('tol',d.settings.snap_tolerance); document.getElementById('tolVal').textContent=(d.settings.snap_tolerance||0).toFixed(2);
+    setVal('debounce',d.settings.debounce_ms); setVal('xmode',d.settings.x_mode);
+    setVal('deadZone',d.settings.deadZone); document.getElementById('dzVal').textContent=(+d.settings.deadZone||0.03).toFixed(3);
+    setVal('holdMinTime',d.settings.holdMinTime); document.getElementById('hmtVal').textContent=(+d.settings.holdMinTime||0.2).toFixed(2);
+    setVal('flickWindow',d.settings.flickWindow); document.getElementById('fwVal').textContent=(+d.settings.flickWindow||0.2).toFixed(2);
+    setVal('flick',d.settings.flick_speed); document.getElementById('fvVal').textContent=(+d.settings.flick_speed||2).toFixed(2);
+    setVal('flickMaxDist',d.settings.flickMaxDist); document.getElementById('fmdVal').textContent=(+d.settings.flickMaxDist||0.25).toFixed(2);
+    setVal('dragSample',d.settings.drag_sample_ms); document.getElementById('dsVal').textContent=(d.settings.drag_sample_ms||25);
+    setVal('dragMinSpeed',d.settings.dragMinSpeed); document.getElementById('dmsVal').textContent=(+d.settings.dragMinSpeed||0.25).toFixed(2);
+    setVal('dragMaxDur',d.settings.dragMaxDur); document.getElementById('dmdVal').textContent=(+d.settings.dragMaxDur||1.5).toFixed(1);
+    setVal('hit_offset', d.settings.hit_offset_ms||0);
+    setVal('oscPort', d.osc_port);
+  }
+  if(d.meta && d.meta.name!=null) setVal('chartName', d.meta.name);
+  if(d.meta){ if(d.meta.composer!=null) setVal('composer', d.meta.composer); if(d.meta.charter!=null) setVal('charter', d.meta.charter); }
+  if(d.cover_filename){
+    const img=document.getElementById('coverPreview');
+    img.src='/audio/'+encodeURIComponent(d.cover_filename)+'?t='+Date.now();
+    img.style.display='block';
+  }
+});
+function setLed(id, on, bad){
+  const e=document.getElementById(id);
+  e.className='dotled'+(on?(bad?' bad':' on'):'');
+}
+socket.on('preview', d=>{
+  if(Array.isArray(d.notes)) preview.notes=d.notes;
+  for(const [k,v] of Object.entries(d)){ if(k!=='notes') preview[k]=v; }
+});
+const oscLines=[];
+let oscRenderPending=false, lastMoveShown=0;
+socket.on('osc_raw', d=>{
+  if(!monitoring) return;
+  // /move 可能达到每秒数百条。监视器只用于诊断，不必逐包绘制；否则
+  // textContent += 会反复复制不断增长的字符串，最终拖慢页面和音频播放。
+  const now=performance.now();
+  if(d.address==='/move' && now-lastMoveShown<50) return;
+  if(d.address==='/move') lastMoveShown=now;
+  oscLines.push(`[${d.address}]  ` + JSON.stringify(d.args));
+  if(oscLines.length>250) oscLines.splice(0, oscLines.length-250);
+  if(!oscRenderPending){
+    oscRenderPending=true;
+    requestAnimationFrame(()=>{
+      oscRenderPending=false;
+      const m=document.getElementById('monitor');
+      m.textContent=oscLines.join('\n')+'\n';
+      m.scrollTop=m.scrollHeight;
+    });
+  }
+});
+socket.on('exported', d=>{
+  let html='';
+  if(d.pez){
+    html+=`已导出通用谱包：<a class="dl" href="/download/${encodeURIComponent(d.pez)}">${d.pez}</a>`;
+    html+=`<br><b style="color:var(--amber)">这个 .pez 平台通用：iPad Phira 与 Windows RPE/PhiEdit 都直接导入这一个文件即可（音乐+曲绘+谱面全在里面），无需再传任何单独文件。</b>`;
+  } else {
+    html+=`导出失败，请重试`;
+  }
+  html+=` （${JSON.stringify(d.stats)}）`;
+  document.getElementById('dl').innerHTML=html;
+  toast('导出成功：'+(d.pez||''),'success');
+});
+
+function setVal(id,v){ const e=document.getElementById(id); if(e) e.value=v; }
+function getSettings(){
+  return {
+    bpm: +document.getElementById('bpm').value,
+    offset_ms: +document.getElementById('offset').value,
+    beats_per_bar: +document.getElementById('bpb').value,
+    subdivision: +document.getElementById('subdiv').value,
+    snap_tolerance: +document.getElementById('tol').value,
+    debounce_ms: +document.getElementById('debounce').value,
+    x_mode: document.getElementById('xmode').value,
+    flick_speed: +document.getElementById('flick').value,
+    drag_sample_ms: +document.getElementById('dragSample').value,
+    dragMinSpeed: +document.getElementById('dragMinSpeed').value,
+    dragMaxDur: +document.getElementById('dragMaxDur').value,
+    deadZone: +document.getElementById('deadZone').value,
+    holdMinTime: +document.getElementById('holdMinTime').value,
+    flickWindow: +document.getElementById('flickWindow').value,
+    flickMaxDist: +document.getElementById('flickMaxDist').value,
+    hit_offset_ms: +document.getElementById('hit_offset').value,
+  };
+}
+function saveSettings(){
+  const meta = { name: document.getElementById('chartName').value, level: document.getElementById('chartLevel').value, composer: document.getElementById('composer').value, charter: document.getElementById('charter').value };
+  socket.emit('save_settings', {settings:getSettings(), meta:meta});
+}
+['bpm','offset','bpb','subdiv','debounce','xmode','chartName','chartLevel','deadZone','holdMinTime','flickWindow','flickMaxDist','flick','dragSample','dragMinSpeed','dragMaxDur','hit_offset'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', saveSettings);
+});
+['tol','deadZone','holdMinTime','flickWindow','flick','flickMaxDist','dragSample','dragMinSpeed','dragMaxDur'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', e=>{
+    const v=+e.target.value;
+    if(id==='tol') document.getElementById('tolVal').textContent=v.toFixed(2);
+    if(id==='deadZone') document.getElementById('dzVal').textContent=v.toFixed(3);
+    if(id==='holdMinTime') document.getElementById('hmtVal').textContent=v.toFixed(2);
+    if(id==='flickWindow') document.getElementById('fwVal').textContent=v.toFixed(2);
+    if(id==='flick') document.getElementById('fvVal').textContent=v.toFixed(2);
+    if(id==='flickMaxDist') document.getElementById('fmdVal').textContent=v.toFixed(2);
+    if(id==='dragSample') document.getElementById('dsVal').textContent=v;
+    if(id==='dragMinSpeed') document.getElementById('dmsVal').textContent=v.toFixed(2);
+    if(id==='dragMaxDur') document.getElementById('dmdVal').textContent=v.toFixed(1);
+  });
+  document.getElementById(id).addEventListener('change', saveSettings);
+});
+
+// 音频上传 + 浏览器播放（选文件即自动导入）
+function uploadAudio(){
+  const f=document.getElementById('audioFile').files[0];
+  if(!f){toast('请先选择音频文件','error');return;}
+  const fd=new FormData(); fd.append('file',f);
+  fetch('/upload',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+    if(d.ok){
+      audio.src='/audio/'+encodeURIComponent(d.filename);
+      audio.load();
+      socket.emit('audio_loaded',{filename:d.filename});
+      document.getElementById('audioInfo').textContent='已加载：'+d.filename+' — 点播放即可出声';
+      toast('音频已导入: '+d.filename,'success');
+    } else toast('上传失败: '+(d.msg||''),'error');
+  }).catch(()=>toast('上传失败，后端可能未运行','error'));
+}
+document.getElementById('uploadBtn').onclick=uploadAudio;
+document.getElementById('audioFile').addEventListener('change', uploadAudio);
+
+// 曲绘上传（选文件即自动导入）
+function uploadCover(){
+  const f=document.getElementById('coverFile').files[0];
+  if(!f){toast('请先选择图片文件','error');return;}
+  const fd=new FormData(); fd.append('file',f);
+  fetch('/upload_cover',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+    if(d.ok){
+      const img=document.getElementById('coverPreview');
+      img.src='/audio/'+encodeURIComponent(d.filename)+'?t='+Date.now();
+      img.style.display='block';
+      toast('曲绘已导入: '+d.filename,'success');
+    } else toast('上传失败: '+(d.msg||''),'error');
+  }).catch(()=>toast('上传失败，后端可能未运行','error'));
+}
+document.getElementById('coverBtn').onclick=uploadCover;
+document.getElementById('coverFile').addEventListener('change', uploadCover);
+document.getElementById('coverClearBtn').onclick=()=>{
+  socket.emit('cover_clear');
+  const img=document.getElementById('coverPreview');
+  img.style.display='none'; img.src='';
+  toast('已清除曲绘','info');
+};
+document.getElementById('playBtn').onclick=()=>{
+  if(!audio.src){toast('请先选择并导入音频','error');return;}
+  if(audio.ended || audio.currentTime >= (audio.duration||0) - 0.05){ audio.currentTime = 0; }
+  audio.play().catch(err=>toast('播放失败：'+((err&&err.message)||err),'error'));
+};
+document.getElementById('pauseBtn').onclick=()=>audio.pause();
+document.getElementById('stopBtn').onclick=()=>{ audio.pause(); audio.currentTime=0; pushAudioTime(); };
+
+// OSC
+document.getElementById('oscPort').addEventListener('change', ()=>{
+  socket.emit('save_settings',{settings:{osc_port:+document.getElementById('oscPort').value}, meta:{}});
+});
+document.getElementById('monBtn').onclick=()=>{
+  if(!monitoring){ socket.emit('monitor_start'); monitoring=true;
+    document.getElementById('monBtn').textContent='停止监听 OSC';
+    oscLines.length=0; document.getElementById('monitor').textContent=''; }
+  else { socket.emit('monitor_stop'); monitoring=false;
+    document.getElementById('monBtn').textContent='开始监听 OSC'; }
+};
+document.getElementById('selftestBtn').onclick=()=>socket.emit('osc_selftest');
+document.getElementById('simBtn').onclick=()=>socket.emit('sim_inject');
+document.getElementById('calibBtn').onclick=()=>socket.emit('auto_calibrate');
+
+// 录制（与音频联动）
+let isRecording=false;
+let recordingPointerWasLocked=false;
+function releaseRecordingPointer(){
+  document.body.classList.remove('recording-lock');
+  if(document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+}
+function startRec(){
+  isRecording=true;
+  document.body.classList.add('recording-lock');
+  // Pointer Lock keeps physical trackpad clicks from moving the pointer onto
+  // controls while the raw multitouch collector records the same gesture.
+  const lockTarget=document.documentElement;
+  if(lockTarget.requestPointerLock){
+    try{
+      const result=lockTarget.requestPointerLock();
+      if(result && result.catch) result.catch(()=>{});
+    }catch(_){ }
+  }
+  if(audio.src){ audio.currentTime=0; audio.play().catch(()=>{}); }
+  else toast('未导入音频：将以内部时钟录制（仅供测试）','info');
+  socket.emit('record_start');
+  toast('录制中：光标已锁定；按 Esc 或点「停止录制」结束','info');
+}
+function stopRec(reason='button'){
+  if(!isRecording) return;
+  isRecording=false;
+  releaseRecordingPointer();
+  audio.pause(); socket.emit('record_stop',{reason});
+}
+// Pointer Lock 不可用时仍拦截录制期间的误点；停止按钮保留可用。
+document.addEventListener('click', e=>{
+  if(isRecording && e.target!==document.getElementById('stopRecBtn')){
+    e.preventDefault(); e.stopImmediatePropagation();
+  }
+}, true);
+document.addEventListener('keydown', e=>{
+  if(isRecording && e.key==='Escape'){
+    e.preventDefault(); stopRec('escape');
+  }
+}, true);
+document.addEventListener('pointerlockchange', ()=>{
+  if(document.pointerLockElement){ recordingPointerWasLocked=true; return; }
+  // Pointer Lock may be released by macOS/browser focus changes. Losing it
+  // must never silently stop a recording; CSS still keeps the cursor hidden.
+  if(isRecording && recordingPointerWasLocked){
+    toast('光标锁定已释放，但录制仍在继续；点“停止录制”才会结束','info');
+  }
+  recordingPointerWasLocked=false;
+});
+document.addEventListener('pointerdown', ()=>{
+  if(!isRecording || document.pointerLockElement) return;
+  const target=document.documentElement;
+  if(target.requestPointerLock){
+    try{ const p=target.requestPointerLock(); if(p&&p.catch) p.catch(()=>{}); }catch(_){ }
+  }
+}, true);
+window.addEventListener('pagehide', releaseRecordingPointer);
+window.addEventListener('beforeunload', releaseRecordingPointer);
+document.getElementById('recBtn').onclick=startRec;
+document.getElementById('stopRecBtn').onclick=()=>stopRec('button');
+document.getElementById('clearBtn').onclick=()=>socket.emit('clear_events');
+document.getElementById('exportBtn').onclick=()=>socket.emit('export_rpe');
+document.getElementById('openBtn').onclick=()=>{
+  fetch('/open_exports').then(r=>r.json()).then(d=>{
+    if(!d.ok) toast('无法打开文件夹：'+(d.msg||''),'error');
+    else toast('已打开导出文件夹','success');
+  }).catch(()=>toast('打开文件夹失败，后端可能未运行','error'));
+};
+
+// ---- 类 Phigros 竖向滚动预览 ----
+const cv=document.getElementById('cv'); const ctx=cv.getContext('2d');
+let DPR=window.devicePixelRatio||1;
+function resize(){ cv.width=cv.clientWidth*DPR; cv.height=cv.clientHeight*DPR; }
+window.addEventListener('resize',resize); resize();
+
+// 判定线位置可切换：top=判定线在顶部；bottom=判定线在底部(经典 Phigros)。
+// 两种模式音符都从上往下流动，越过判定线后继续向下，只是判定线的摆放位置不同。
+let JUDGE_MODE='top';
+document.getElementById('judgeMode').addEventListener('change', e=>{ JUDGE_MODE=e.target.value; });
+
+// 平滑滚动：用浏览器 audio 时钟插值；无音频时用虚拟时钟自动滚动（便于查看录制/模拟结果）
+let virtualBeat=0, lastT=performance.now();
+function currentBeat(){
+  const now=performance.now(); const dt=(now-lastT)/1000; lastT=now;
+  if(audio.src && preview.audioTime!=null){
+    const bpm=preview.bpm||120;
+    return preview.playhead + (audio.currentTime - preview.audioTime)*(bpm/60.0);
+  }
+  // 无音频：虚拟时钟，循环滚动
+  let maxB=4; for(const n of (preview.notes||[])) maxB=Math.max(maxB, n.endBeat||n.startBeat);
+  virtualBeat += dt*(preview.bpm/60.0);
+  if(virtualBeat>maxB+2) virtualBeat=0;
+  return virtualBeat;
+}
+
+// 判定线位置：top=顶部 / bottom=底部(经典)。音符一律自上而下流过判定线；
+// VISIBLE_BEATS 为判定线"来路"一侧的可见拍数（bottom 模式上方整屏都是来路，top 模式音符过线后铺满下方整屏）。
+const VISIBLE_BEATS=6;
+
+function draw(){
+  const W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const bpb=preview.beats_per_bar||4;
+  const beat=currentBeat();
+  const judgeY=H*((JUDGE_MODE==='top')?0.16:0.84);     // 判定线高度位置
+  const pxPerBeat=(H-judgeY)/VISIBLE_BEATS;            // 每拍像素
+  const xOf=px=>W*((px+675)/1350);                     // positionX(-675~675)->画布 x
+  const yOf=b=>judgeY - (b-beat)*pxPerBeat;            // 拍 -> y（未来音符在线上方，向下流动）
+
+  // 背景纵深
+  let g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#0b1424'); g.addColorStop(1,'#070b14');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  // 纵向 X 分区竖线（9 区）
+  ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=1;
+  for(let i=1;i<9;i++){ const x=xOf(-675+i*(1350/9)); ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  ctx.strokeStyle='rgba(255,255,255,.12)';
+  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+
+  // 拍点辅助线（随当前时间滚动，上下两侧都画，兼容两种判定线位置）
+  const startBeat=Math.floor(beat)-VISIBLE_BEATS-2;
+  for(let b=startBeat; b<=beat+VISIBLE_BEATS+2; b++){
+    const y=yOf(b); if(y<-20||y>H+20) continue;
+    const isBar=(b%bpb===0);
+    ctx.strokeStyle=isBar?'rgba(160,200,255,.28)':'rgba(160,200,255,.10)';
+    ctx.lineWidth=isBar?1.5:1;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+
+  // 判定线（亮线）
+  ctx.strokeStyle='rgba(120,200,255,.95)'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(0,judgeY); ctx.lineTo(W,judgeY); ctx.stroke();
+  ctx.fillStyle='rgba(120,200,255,.08)'; ctx.fillRect(0,judgeY-7*DPR, W, 14*DPR); // 命中区提示
+
+  // 音符（自上而下流过判定线，过线时刻=命中时刻，随后继续向下淡出视野）
+  const notes=preview.notes||[];
+  const noteH=12*DPR;
+  for(const n of notes){
+    const x=xOf(n.positionX);
+    const y=yOf(n.startBeat);
+    if(y<-40||y>H+60) continue;
+    if(n.type===2){ // Hold：长竖条（绿），自判定线向"来路"延伸
+      const yEnd=yOf(n.endBeat);
+      ctx.fillStyle='#33d69f';
+      const w=14*DPR;
+      ctx.fillRect(x-w/2, Math.min(y,yEnd), w, Math.abs(yEnd-y)+noteH);
+      ctx.fillStyle='#aaffdd'; ctx.fillRect(x-w/2, y-noteH/2, w, noteH); // head
+    } else if(n.type===4){ // Drag：黄色短条（轨迹在下面单独连线）
+      ctx.fillStyle='#ffcf4d'; const w=14*DPR;
+      roundRect(x-w/2, y-noteH/2, w, noteH, 4*DPR); ctx.fill();
+    } else if(n.type===3){ // Flick：红键 + 方向箭头
+      ctx.save(); ctx.translate(x,y);
+      const ang=Math.atan2((n.dir&&n.dir[1])||0, (n.dir&&n.dir[0])||1);
+      ctx.rotate(ang);
+      ctx.fillStyle='#ff5d6c'; const w=16*DPR, h=12*DPR;
+      roundRect(-w/2,-h/2,w,h,4*DPR); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(w/2,-h); ctx.lineTo(w/2+h*1.1,0); ctx.lineTo(w/2,h); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    } else { // Tap：蓝色圆角短条
+      ctx.fillStyle='#3aa0ff'; const w=14*DPR;
+      roundRect(x-w/2, y-noteH/2, w, noteH, 4*DPR); ctx.fill();
+    }
+  }
+  // Drag 轨迹连线：只把"同一段手势(gid)"的点连成一条平滑曲线，避免所有拖拽被连成一条长线
+  const groups={};
+  notes.filter(n=>n.type===4).forEach(n=>{
+    const k=(n.gid!=null)?('g'+n.gid):('_'+Math.round(n.startBeat*1000));
+    (groups[k]=groups[k]||[]).push(n);
+  });
+  Object.keys(groups).forEach(k=>{
+    const grp=groups[k].slice().sort((a,b)=>a.startBeat-b.startBeat);
+    let prev=null;
+    grp.forEach(n=>{
+      const x=xOf(n.positionX); const y=yOf(n.startBeat);
+      if(prev){ ctx.strokeStyle='rgba(255,207,77,.6)'; ctx.lineWidth=2*DPR;
+        ctx.beginPath(); ctx.moveTo(prev.x,prev.y); ctx.lineTo(x,y); ctx.stroke(); }
+      prev={x,y};
+    });
+  });
+
+  // 当前拍标
+  ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font=`${12*DPR}px ui-monospace,monospace`;
+  ctx.fillText('拍 '+beat.toFixed(2), 8*DPR, 18*DPR);
+
+  requestAnimationFrame(draw);
+}
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+draw();
+
+// 双击预览画布才跳转；录制中完全禁用。单击会与触控板打谱的物理按压
+// 冲突，曾导致每次打 Tap 都把音乐跳到鼠标所在位置。
+cv.addEventListener('dblclick', e=>{
+  if(isRecording){ toast('录制中不能跳转时间','info'); return; }
+  if(!audio.src){ toast('导入音频后可在画布上双击跳转','info'); return; }
+  const rect=cv.getBoundingClientRect();
+  const y=(e.clientY-rect.top)*DPR;
+  const H=cv.height;
+  const judgeY=H*((JUDGE_MODE==='top')?0.16:0.84);
+  const pxPerBeat=(H-judgeY)/VISIBLE_BEATS;
+  const beat=currentBeat();
+  const targetBeat=beat + (judgeY-y)/pxPerBeat;   // 音符自上而下：线上方=未来，线下方=过去
+  const bpm=preview.bpm||120;
+  const sec=(preview.offset_ms||0)/1000 + targetBeat/(bpm/60);
+  if(sec>=0 && audio.duration && sec<audio.duration){ audio.currentTime=sec; }
+});
+// Clock updates stay smooth at 5 Hz; note arrays are only returned when their
+// revision changes, avoiding an ever-growing full-chart transfer every 80 ms.
+setInterval(()=>socket.emit('get_preview',{revision:preview.revision}), 200);
+socket.emit('get_state');
+</script>
+</body>
+</html>

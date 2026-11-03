@@ -1,0 +1,33 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+backend/venv/
+venv/
+.env
+
+# ---- 运行期产生的数据（不进仓库）----
+backend/uploads/
+backend/exports/
+*.log
+*.bak-*
+*.pez
+
+# ---- macOS ----
+.DS_Store
+.AppleDouble
+.Spotlight-V100
+
+# ---- TouchBridge 编译产物（用 build.sh 重新生成）----
+TouchBridge/TouchBridge
+TouchBridge/TouchBridge.app/
+TouchBridge/.build/
+
+# ---- 本机诊断 / 临时实验 ----
+legacy_mt_test*
+mactic*
+watchdog.command
+
+# ---- 编辑器 / 系统 ----
+.idea/
+.vscode/
+*.swp

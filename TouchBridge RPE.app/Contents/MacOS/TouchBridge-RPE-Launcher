@@ -1,0 +1,4 @@
+#!/bin/bash
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+nohup /bin/bash "$ROOT/run.command" --app >/tmp/touchbridge_rpe_app.log 2>&1 &
+exit 0

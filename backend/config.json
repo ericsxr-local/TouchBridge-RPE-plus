@@ -1,0 +1,48 @@
+{
+  "osc": {
+    "port": 9000,
+    "address": "*"
+  },
+  "mapping": {
+    "finger_arg": 0,
+    "gesture_arg": 1,
+    "x_arg": 2,
+    "gesture_map": {
+      "tap": "tap",
+      "hold": "hold",
+      "drag": "drag"
+    },
+    "x_is_region": false,
+    "region_count": 9
+  },
+  "settings": {
+    "bpm": 120,
+    "offset_ms": 0,
+    "beats_per_bar": 4,
+    "subdivision": 8,
+    "snap_tolerance": 0.6,
+    "debounce_ms": 40,
+    "x_mode": "coordinate",
+    "regions": 9,
+    "flick_speed": 2,
+    "drag_sample_ms": 25,
+    "deadZone": 0.03,
+    "holdMinTime": 0.2,
+    "flickWindow": 0.2,
+    "flickMaxDist": 0.25,
+    "segments": [],
+    "dragMinSpeed": 0.25,
+    "dragMaxDur": 1.5,
+    "hit_offset_ms": 0
+  },
+  "meta": {
+    "name": "Untitled",
+    "charter": "",
+    "composer": "",
+    "level": "",
+    "id": "",
+    "background": "",
+    "song": null,
+    "cover": null
+  }
+}

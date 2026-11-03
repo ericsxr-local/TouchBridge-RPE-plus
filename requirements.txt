@@ -1,0 +1,5 @@
+flask>=3.0
+flask-socketio>=5.3
+# 说明：OSC 监听与音频播放均已改为纯 Python 实现，无需 pythonosc / pygame。
+# 音频由浏览器(HTML5 audio)播放，所以后端也不需要任何音频库。
+# （python-socketio / python-engineio 会作为 flask-socketio 的依赖自动安装。）
